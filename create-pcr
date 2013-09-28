@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# PCR (Pacman Cache Repository) Script (v1.37)
+# PCR (Pacman Cache Repository) Script (v1.38)
 # https://github.com/yadieet/pcr
 #
 # yadieet sa <qts19bit@gmail.com>
 
 
 if [[ $EUID == 0 ]]; then
-   echo "Sorry but don't run this script root."
+   echo "Sorry, please don't run this script as root."
    exit
 fi
 
@@ -22,7 +22,7 @@ for arg in "$@"
 do
 	if [[ $arg == "-h" ]]; then
 
-echo "PCR (Pacman Cache Repository) Script (v1.37)"
+echo "PCR (Pacman Cache Repository) Script (v1.38)"
 echo "-- Create local repository from pacman cache."
 echo "https://github.com/yadieet/pcr"
 echo ""
