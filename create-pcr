@@ -1,0 +1,122 @@
+#!/bin/bash
+
+# YSA PCR V1.36 - create PCR (pacman cache repository)
+# http://www.kaskus.co.id/thread/51dbb48d6212432422000001/arch-linux-community---part-1/
+#
+# yadieet sa <qts19bit@gmail.com>
+
+if [[ $EUID == 0 ]]; then
+   echo "Sorry but don't run this script as root user."
+   exit
+fi
+
+if [[ -z $@ ]]; then
+	echo Missing arguments !
+	echo Please give some repox arguments ! \(Example: core extra community multilib mate\)
+	exit
+fi
+
+for repox in $@
+do
+	pkglist=`pacman -Sl $repox`
+	if [[ -z `echo "$pkglist" | awk {'print $1'}` ]]; then
+		echo "Repox '$repox' was not found."
+		exit
+	fi
+done
+
+pacman_cache_dir="/var/cache/pacman/pkg/"
+prefer_installed=1
+copying=0
+basepath="/data/"
+outdir="PCR"
+arch=`uname -m`
+
+if [ ! -e "$basepath" ]; then
+		echo "Cannot continue, path '$basepath' doesn't extst !"
+		exit
+fi
+
+cd "$basepath"
+
+if [ -e "$outdir" ]; then
+		echo Cannot continue, output directory exist. Please remove first !
+		exit
+fi
+
+mkdir -p "$outdir/archlinux"
+cd "$outdir/archlinux"
+
+t=0
+
+function copyx() {
+	t=$(($t+1))
+	echo "#"$t: Copying `ls $1` to [$2] directory.. [$3]
+	cp -L $1 $2/os/$arch
+}
+function linkingx() {
+	t=$(($t+1))
+	echo "#"$t: Linking `ls $1` to [$2] directory.. [$3]
+	ln -s $1 $2/os/$arch
+}
+
+for repox in $@
+do
+	mkdir -p $repox/os/$arch
+		pkglist=`pacman -Sl $repox`
+	while read pkg
+	do
+		pkgname=`echo $pkg | awk {'print $2'}`
+		pkgver=`echo $pkg | awk {'print $3'}`
+		filex=$pacman_cache_dir"$pkgname-$pkgver"*.pkg.tar.xz
+		if [ ! -e $filex ]; then
+			inspkg=$(echo "`pacman -Q`" | grep -m 1 "^$pkgname")
+			if [[ ! -z "$inspkg" ]]; then
+				insver=`echo "$inspkg" | awk {'print $2'}`
+				if [[ "$pkgver" != "$insver" ]];then
+					filexx=$pacman_cache_dir"$pkgname-$insver"*.pkg.tar.xz
+					if [ -e $filexx ]; then
+						[[ $copying == 1 ]] && copyx $filexx $repox 3 || linkingx $filexx $repox 3
+					else
+						echo - $pkgname-$pkgver package file is not exist. [2]
+					fi
+				else
+					echo - $pkgname-$pkgver package file is not exist. [1]
+				fi
+			else
+				echo - $pkgname-$pkgver package file is not exist. [0]
+			fi
+		else
+			if [[ $prefer_installed == 1 ]]; then
+				inspkg=$(echo "`pacman -Q`" | grep -m 1 "^$pkgname")
+				if [[ ! -z "$inspkg" ]]; then
+					insver=`echo "$inspkg" | awk {'print $2'}`
+					if [[ "$pkgver" != "$insver" ]];then
+						filexx=$pacman_cache_dir"$pkgname-$insver"*.pkg.tar.xz
+						if [ ! -e $filexx ]; then
+							[[ $copying == 1 ]] && copyx $filex $repox 8 || linkingx $filex $repox 8
+						else
+							[[ $copying == 1 ]] && copyx $filexx $repox 7 || linkingx $filexx $repox 7
+						fi
+					else
+						[[ $copying == 1 ]] && copyx $filex $repox 6 || linkingx $filex $repox 6
+					fi
+				else
+					[[ $copying == 1 ]] && copyx $filex $repox 5 || linkingx $filex $repox 5
+				fi
+			else	
+				[[ $copying == 1 ]] && copyx $filex $repox 4 || linkingx $filex $repox 4
+			fi
+		fi
+		done < <(echo "$pkglist")
+done
+
+for repox in $@
+do
+	cd "$basepath/$outdir/archlinux/$repox/os/$arch"
+	repo-add $repox.db.tar.gz *.pkg.tar.xz
+done
+
+echo "======================================="
+echo "Finished. Have a lovely beautiful day.."
+echo "Total: $t packages."
