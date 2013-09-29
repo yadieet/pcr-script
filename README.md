@@ -1,4 +1,9 @@
-pcr
+<h2>Create PCR (Pacman Cache Repository) Script</h2>
 ===
 
-Pacman Cache Repository. A bash script to create archlinux local repository from pacman cache.
+A bash script to create archlinux local repository from pacman cache.
+
+- Backup installed packages files
+- Create local repository
+- Create local-network repository
+- Etc

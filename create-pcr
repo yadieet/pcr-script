@@ -1,20 +1,22 @@
 #!/bin/bash
 
-# PCR (Pacman Cache Repository) Script (v1.38)
+# PCR (Pacman Cache Repository) Script
 # https://github.com/yadieet/pcr
 #
 # yadieet sa <qts19bit@gmail.com>
 
+version="1.39.1"
 
 if [[ $EUID == 0 ]]; then
    echo "Sorry, please don't run this script as root."
    exit
 fi
 
-
 if [[ -z $@ ]]; then
 	echo "Cannot continue, missing arguments. (Use -h for help)"
-	echo "Example : $ create-pcr -r \"core extra community multilib mate\" -o \"/data/\" -cp 0 -pi 1"
+	echo "Example usage :"
+	echo "- $ create-pcr -r \"core extra community multilib mate\" -o \"/data/\" -cp 0 -pi 1\""
+	echo "- $ create-pcr -r \"core extra community multilib mate\" -ifd \"/data_ext/ARCHLINUX_DATA/aur_packages/\" -o \"/data/\" -cp 0 -pi 1 -q"
 	exit
 fi
 
@@ -22,19 +24,53 @@ for arg in "$@"
 do
 	if [[ $arg == "-h" ]]; then
 
-echo "PCR (Pacman Cache Repository) Script (v1.38)"
+echo "PCR (Pacman Cache Repository) Script (v$version)"
 echo "-- Create local repository from pacman cache."
 echo "https://github.com/yadieet/pcr"
-echo ""
+echo
 echo "OPTIONS :"
-echo "-r  : repositories, example : \"core extra community multilib mate\""
-echo "-o  : output directory, must already exist. This script will create the 'PCR' directory under output directory."
-echo "-cp : copy mode (default is '0'). If value is not '1', use linking mode."
-echo "-pi : prefer installed (default is '1'). Use installed version of package if the current version and installed version of package are exists."
-echo ""
+echo "-r   : Repositories."
+echo "       Example : \"core extra community multilib mate\""
+echo "-o   : Output directory. Must already exists."
+echo "       This script will create the 'PCR' directory under the output directory."
+echo "-cp  : Copy mode (default is '0')."
+echo "       If value is not '1', use linking mode."
+echo "-pi  : Prefer installed (default is '1')."
+echo "       Use installed version of packages if the current up-to-date version and installed version of packages are exists."
+echo "-ifd : Include a directory where foreign packages are saved, to create the 'foreign' repository."
+echo "       For example, the yaourt 'EXPORTDIR' directory where AUR packages are saved/exported."
+echo "       Note: Only installed packages will be processed."
+echo "-q   : Quiet. Do not print \"file is not exists\" messages."
+echo "-v   : Show version then exit."
+echo
 echo "Example usage :"
-echo "$ create-pcr -r \"core extra community multilib mate\" -o \"/data/\" -cp 0 -pi 1"
+echo "- $ create-pcr -r \"core extra community multilib mate\" -o \"/data/\" -cp 0 -pi 1\""
+echo "- $ create-pcr -r \"core extra community multilib mate\" -ifd \"/data_ext/ARCHLINUX_DATA/aur_packages/\" -o \"/data/\" -cp 0 -pi 1 -q"
+echo
+echo "The main purpose of this script is to create something that I called it, 'PCR'."
+echo "For myself, the use of PCR, for example :"
+echo "- backup installed packages files"
+echo "- create local repository"
+echo "- create local-network repository"
+echo "- etc."
 		exit
+	fi
+done
+
+for arg in "$@"
+do
+	if [[ $arg == "-v" ]]; then
+		echo "$version"
+		exit
+	fi
+done
+
+quiet=0
+for arg in "$@"
+do
+	if [[ $arg == "-q" ]]; then
+		quiet=1
+		break
 	fi
 done
 
@@ -66,7 +102,7 @@ do
 	fi
 done
 
-pacman_cache_dir="/var/cache/pacman/pkg/"
+pacman_cache_dir=`realpath "/var/cache/pacman/pkg/"`
 if [ ! -d "$pacman_cache_dir" ]; then
 	echo "Cannot continue, pacman cache directory '$pacman_cache_dir' is not exist."
 	exit
@@ -86,7 +122,7 @@ do
 		break
 	fi
 done
-if [[ "$outdir" == 0 || -z "$outdir" ]]; then
+if [[ $outdir == 0 || -z "$outdir" ]]; then
 	echo "Cannot continue, please specify output directory. (Example: -o \"/data/\" )"
 	exit
 fi
@@ -94,6 +130,7 @@ if [ ! -d "$outdir" ]; then
 	echo "Cannot continue, output directory '$outdir' is not exist."
 	exit
 fi
+outdir=`realpath "$outdir"`
 if [ ! -w "$outdir" ]; then
 	echo "Cannot continue, output directory '$outdir' is not writable."
 	exit
@@ -109,7 +146,7 @@ do
 		break
 	fi
 done
-if [[ "$copying" != 0 && $copying != 1 ]]; then
+if [[ $copying != 0 && $copying != 1 ]]; then
 	copying=0
 fi
 
@@ -123,28 +160,63 @@ do
 		break
 	fi
 done
-if [[ "$prefer_installed" != 0 && $prefer_installed != 1 ]]; then
+if [[ $prefer_installed != 0 && $prefer_installed != 1 ]]; then
 	prefer_installed=1
+fi
+
+foreign=0
+iarg=1
+for arg in "$@"
+do
+	((iarg++))
+	if [[ $arg == "-ifd" ]]; then
+		foreign=${@:$iarg:1}
+		if [[ -z "$foreign" ]]; then
+			foreign=0
+		fi
+		break
+	fi
+done
+if [[ $foreign != 0 ]]; then
+	if [ ! -d "$foreign" ]; then
+		echo "Cannot continue, '$foreign' directory is not exist."
+		exit
+	fi
+	foreign=`realpath "$foreign"`
+	if [ ! -r "$foreign" ]; then
+		echo "Cannot continue, '$foreign' directory is not readable."
+		exit
+	fi
 fi
 
 echo "Configuration :"
 echo "==============="
-echo "Pacman cache directory         = '$pacman_cache_dir'"
-echo "Repositories (-r)              = $repoxs"
-echo "Output directory (-o)          = '$outdir'"
-echo -n "Copy mode (-cp)                = ";  [[ $copying == 0 ]] && echo "no (linking)" || echo "yes"
-echo -n "Prefer installed version (-pi) = ";  [[ $prefer_installed == 0 ]] && echo "no" || echo "yes"
-echo ""
-
-arch=`uname -m`
+echo "Pacman cache directory ---------- = '$pacman_cache_dir'"
+echo "Repositories (-r) --------------- = $repoxs"
+echo "Output directory (-o) ----------- = '$outdir'"
+echo -n "Copy mode (-cp) ----------------- = ";  [[ $copying == 0 ]] && echo "No. Use linking mode" || echo "Yes"
+echo -n "Prefer installed (-pi) ---------- = ";  [[ $prefer_installed == 0 ]] && echo "No" || echo "Yes"
+[[ "$foreign" != 0 ]] && echo "Foreign packages directory (-ifd) = '$foreign'"
+echo
 
 cd "$outdir"
 if [ -e "PCR" ]; then
-		echo "Cannot continue, 'PCR' directory in '$outdir' exist. Please remove 'PCR' directory first."
+		echo "Cannot continue, the 'PCR' directory under '$outdir' is exists. Please remove the existing 'PCR' directory first."
 		exit
 fi
+
+for i in 5 4 3 2 1
+do
+	echo -n "$i.. "
+	sleep 1
+done
+
+echo
+
 mkdir -p "PCR/archlinux"
 cd "PCR/archlinux"
+
+arch=`uname -m`
 
 t=0
 
@@ -167,23 +239,23 @@ do
 	do
 		pkgname=`echo $pkg | awk {'print $2'}`
 		pkgver=`echo $pkg | awk {'print $3'}`
-		filex=$pacman_cache_dir"$pkgname-$pkgver"*.pkg.tar.xz
+		filex=$pacman_cache_dir/"$pkgname-$pkgver"*.pkg.tar.xz
 		if [ ! -e $filex ]; then
 			inspkg=$(echo "`pacman -Q`" | grep -m 1 "^$pkgname")
 			if [[ ! -z "$inspkg" ]]; then
 				insver=`echo "$inspkg" | awk {'print $2'}`
 				if [[ "$pkgver" != "$insver" ]];then
-					filexx=$pacman_cache_dir"$pkgname-$insver"*.pkg.tar.xz
+					filexx=$pacman_cache_dir/"$pkgname-$insver"*.pkg.tar.xz
 					if [ -e $filexx ]; then
 						[[ $copying == 1 ]] && copyx $filexx $repox 3 || linkingx $filexx $repox 3
 					else
-						echo - $pkgname-$pkgver package file is not exist. [2]
+						[[ $quiet == 0 ]] && echo - $pkgname-$pkgver package file is not exist. [2]
 					fi
 				else
-					echo - $pkgname-$pkgver package file is not exist. [1]
+					[[ $quiet == 0 ]] && echo - $pkgname-$pkgver package file is not exist. [1]
 				fi
 			else
-				echo - $pkgname-$pkgver package file is not exist. [0]
+				[[ $quiet == 0 ]] && echo - $pkgname-$pkgver package file is not exist. [0]
 			fi
 		else
 			if [[ $prefer_installed == 1 ]]; then
@@ -191,7 +263,7 @@ do
 				if [[ ! -z "$inspkg" ]]; then
 					insver=`echo "$inspkg" | awk {'print $2'}`
 					if [[ "$pkgver" != "$insver" ]];then
-						filexx=$pacman_cache_dir"$pkgname-$insver"*.pkg.tar.xz
+						filexx=$pacman_cache_dir/"$pkgname-$insver"*.pkg.tar.xz
 						if [ ! -e $filexx ]; then
 							[[ $copying == 1 ]] && copyx $filex $repox 8 || linkingx $filex $repox 8
 						else
@@ -210,11 +282,32 @@ do
 		done < <(echo "$pkglist")
 done
 
+if [[ $foreign != 0 ]]; then
+	mkdir -p foreign/os/$arch
+	fpkgs=`pacman -Qm`
+	while read fpkg
+	do
+		pkgname=`echo $fpkg | awk {'print $1'}`
+		pkgver=`echo $fpkg | awk {'print $2'}`
+		filex=$foreign/"$pkgname-$pkgver"*.pkg.tar.xz
+		if [ ! -e $filex ]; then
+			[[ $quiet == 0 ]] && echo - $pkgname-$pkgver package file is not exist. [9]
+		else
+			[[ $copying == 1 ]] && copyx $filex foreign 10 || linkingx $filex foreign 10
+		fi
+	done < <(echo "$fpkgs")
+fi
+
 for repox in $repoxs
 do
 	cd "$outdir/PCR/archlinux/$repox/os/$arch"
 	repo-add $repox.db.tar.gz *.pkg.tar.xz
 done
+
+if [[ $foreign != 0 ]]; then
+	cd "$outdir/PCR/archlinux/foreign/os/$arch"
+	repo-add foreign.db.tar.gz *.pkg.tar.xz
+fi
 
 echo "======================================="
 echo "Total: $t packages."
