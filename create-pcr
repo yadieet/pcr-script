@@ -5,7 +5,7 @@
 #
 # yadieet sa <qts19bit@gmail.com>
 
-version="1.39.1"
+version="1.39.3"
 
 if [[ $EUID == 0 ]]; then
    echo "Sorry, please don't run this script as root."
@@ -15,8 +15,8 @@ fi
 if [[ -z $@ ]]; then
 	echo "Cannot continue, missing arguments. (Use -h for help)"
 	echo "Example usage :"
-	echo "- $ create-pcr -r \"core extra community multilib mate\" -o \"/data/\" -cp 0 -pi 1\""
-	echo "- $ create-pcr -r \"core extra community multilib mate\" -ifd \"/data_ext/ARCHLINUX_DATA/aur_packages/\" -o \"/data/\" -cp 0 -pi 1 -q"
+	echo "- $ create-pcr -r \"core extra community multilib mate\" -o \"/data/\" -cp 0 -pi 1"
+	echo "- $ create-pcr -r \"core extra community multilib mate\" -ifd \"/data_ext/ARCHLINUX_DATA/aur_packages/\" -o \"/data/\" -cp 0 -pi 1"
 	exit
 fi
 
@@ -27,28 +27,23 @@ do
 echo "PCR (Pacman Cache Repository) Script (v$version)"
 echo "-- Create local repository from pacman cache."
 echo "https://github.com/yadieet/pcr"
-echo
+echo ""
 echo "OPTIONS :"
-echo "-r   : Repositories."
-echo "       Example : \"core extra community multilib mate\""
-echo "-o   : Output directory. Must already exists."
-echo "       This script will create the 'PCR' directory under the output directory."
-echo "-cp  : Copy mode (default is '0')."
-echo "       If value is not '1', use linking mode."
-echo "-pi  : Prefer installed (default is '1')."
-echo "       Use installed version of packages if the current up-to-date version and installed version of packages are exists."
-echo "-ifd : Include a directory where foreign packages are saved, to create the 'foreign' repository."
-echo "       For example, the yaourt 'EXPORTDIR' directory where AUR packages are saved/exported."
-echo "       Note: Only installed packages will be processed."
-echo "-q   : Quiet. Do not print \"file is not exists\" messages."
-echo "-v   : Show version then exit."
-echo
+echo "-r   : repositories, example : \"core extra community multilib mate\""
+echo "-o   : output directory, must already exist. This script will create the 'PCR' directory under output directory."
+echo "-cp  : copy mode (default is '0'). If value is not '1', use linking mode."
+echo "-pi  : prefer installed (default is '1'). Use installed version of package if the current up-to-date version and installed version of package are exists."
+echo "-fpd : include a directory where foreign packages are saved to create the 'foreign' repository."
+echo "       For example, yaourt 'EXPORTDIR' directory where AUR packages are saved/exported."
+echo "       Note: Only installed packages are processed."
+echo "-quiet   : Don't show \"file is not exists\" messages."
+echo "-version : show version and exit."
+echo ""
 echo "Example usage :"
 echo "- $ create-pcr -r \"core extra community multilib mate\" -o \"/data/\" -cp 0 -pi 1\""
-echo "- $ create-pcr -r \"core extra community multilib mate\" -ifd \"/data_ext/ARCHLINUX_DATA/aur_packages/\" -o \"/data/\" -cp 0 -pi 1 -q"
-echo
-echo "The main purpose of this script is to create something that I called it, 'PCR'."
-echo "For myself, the use of PCR, for example :"
+echo "- $ create-pcr -r \"core extra community multilib mate\" -ifd \"/data_ext/ARCHLINUX_DATA/aur_packages/\" -o \"/data/\" -cp 0 -pi 1"
+echo ""
+echo "This script is to create something that I called it, 'PCR'. For myself, the use of PCR, for example :"
 echo "- backup installed packages files"
 echo "- create local repository"
 echo "- create local-network repository"
@@ -59,7 +54,7 @@ done
 
 for arg in "$@"
 do
-	if [[ $arg == "-v" ]]; then
+	if [[ $arg == "-version" ]]; then
 		echo "$version"
 		exit
 	fi
@@ -68,7 +63,7 @@ done
 quiet=0
 for arg in "$@"
 do
-	if [[ $arg == "-q" ]]; then
+	if [[ $arg == "-quiet" ]]; then
 		quiet=1
 		break
 	fi
@@ -194,29 +189,20 @@ echo "==============="
 echo "Pacman cache directory ---------- = '$pacman_cache_dir'"
 echo "Repositories (-r) --------------- = $repoxs"
 echo "Output directory (-o) ----------- = '$outdir'"
-echo -n "Copy mode (-cp) ----------------- = ";  [[ $copying == 0 ]] && echo "No. Use linking mode" || echo "Yes"
-echo -n "Prefer installed (-pi) ---------- = ";  [[ $prefer_installed == 0 ]] && echo "No" || echo "Yes"
+echo -n "Copy mode (-cp) ----------------- = ";  [[ $copying == 0 ]] && echo "no (linking)" || echo "yes"
+echo -n "Prefer installed (-pi) ---------- = ";  [[ $prefer_installed == 0 ]] && echo "no" || echo "yes"
 [[ "$foreign" != 0 ]] && echo "Foreign packages directory (-ifd) = '$foreign'"
-echo
+echo ""
+
+arch=`uname -m`
 
 cd "$outdir"
 if [ -e "PCR" ]; then
-		echo "Cannot continue, the 'PCR' directory under '$outdir' is exists. Please remove the existing 'PCR' directory first."
+		echo "Cannot continue, 'PCR' directory in '$outdir' exist. Please remove 'PCR' directory first."
 		exit
 fi
-
-for i in 5 4 3 2 1
-do
-	echo -n "$i.. "
-	sleep 1
-done
-
-echo
-
 mkdir -p "PCR/archlinux"
 cd "PCR/archlinux"
-
-arch=`uname -m`
 
 t=0
 
@@ -298,15 +284,23 @@ if [[ $foreign != 0 ]]; then
 	done < <(echo "$fpkgs")
 fi
 
+
+
+trap 'kill -TERM $PID && exit' SIGINT SIGKILL SIGTERM
+
 for repox in $repoxs
 do
 	cd "$outdir/PCR/archlinux/$repox/os/$arch"
-	repo-add $repox.db.tar.gz *.pkg.tar.xz
+	repo-add $repox.db.tar.gz *.pkg.tar.xz &
+	PID=$!
+	wait $PID
 done
 
 if [[ $foreign != 0 ]]; then
 	cd "$outdir/PCR/archlinux/foreign/os/$arch"
-	repo-add foreign.db.tar.gz *.pkg.tar.xz
+	repo-add foreign.db.tar.gz *.pkg.tar.xz &
+        PID=$!
+	wait $PID
 fi
 
 echo "======================================="
