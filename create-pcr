@@ -5,7 +5,7 @@
 #
 # yadieet sa <qts19bit@gmail.com>
 
-version="1.39.3"
+version="1.39.4"
 
 if [[ $EUID == 0 ]]; then
    echo "Sorry, please don't run this script as root."
@@ -33,7 +33,7 @@ echo "-r   : repositories, example : \"core extra community multilib mate\""
 echo "-o   : output directory, must already exist. This script will create the 'PCR' directory under output directory."
 echo "-cp  : copy mode (default is '0'). If value is not '1', use linking mode."
 echo "-pi  : prefer installed (default is '1'). Use installed version of package if the current up-to-date version and installed version of package are exists."
-echo "-fpd : include a directory where foreign packages are saved to create the 'foreign' repository."
+echo "-ifd : include a directory where foreign packages are saved to create the 'foreign' repository."
 echo "       For example, yaourt 'EXPORTDIR' directory where AUR packages are saved/exported."
 echo "       Note: Only installed packages are processed."
 echo "-quiet   : Don't show \"file is not exists\" messages."
