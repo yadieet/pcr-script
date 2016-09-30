@@ -1,4 +1,4 @@
-<h2>Create PCR (Pacman Cache Repository) Script</h2>
+<h2>PCR Script</h2>
 ===
 
 A bash script to create archlinux local repository from pacman cache.
